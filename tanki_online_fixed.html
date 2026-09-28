@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>🎮 Танчики — онлайн</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #050810; color: #fff; font-family: 'Segoe UI', 'SF Pro Display', Tahoma, sans-serif; touch-action: none; }
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 10%, rgba(79,195,247,0.12) 0%, transparent 45%), radial-gradient(circle at 80% 90%, rgba(255,107,107,0.10) 0%, transparent 45%); pointer-events: none; z-index: 0; }
+  #gameWrap { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; z-index: 1; }
+  .topBar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: linear-gradient(180deg, rgba(15,20,40,0.95), rgba(10,14,30,0.75)); border-bottom: 1px solid rgba(79,195,247,0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.6); z-index: 10; gap: 12px; backdrop-filter: blur(20px); padding-top: calc(10px + env(safe-area-inset-top)); position: relative; }
+  .topBar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(79,195,247,0.5), transparent); }
+  .player-score { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 14px; background: rgba(0,0,0,0.4); border: 2px solid; transition: all 0.3s ease; font-size: 0.9em; backdrop-filter: blur(10px); }
+  .player-score.p1 { border-color: rgba(79,195,247,0.6); color: #4fc3f7; box-shadow: 0 0 20px rgba(79,195,247,0.25); }
+  .player-score.p2 { border-color: rgba(255,107,107,0.6); color: #ff6b6b; box-shadow: 0 0 20px rgba(255,107,107,0.25); }
+  .player-score .label { font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 0.85em; }
+  .player-score .score { font-size: 1.5em; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 15px currentColor; line-height: 1; }
+  .round-info { text-align: center; flex: 1; min-width: 100px; }
+  .round-info .round-label { font-size: 0.65em; color: #7a9cbd; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 2px; }
+  .round-info .round-value { font-size: 1.1em; font-weight: 700; color: #ffd54f; text-shadow: 0 0 15px rgba(255,213,79,0.6); letter-spacing: 2px; }
+  #canvasWrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; padding: 12px; z-index: 1; }
+  #gameCanvas { display: block; border-radius: 8px; touch-action: none; max-width: 100%; max-height: 100%; box-shadow: 0 0 60px rgba(79,195,247,0.25), 0 0 120px rgba(0,0,0,0.9); border: 1px solid rgba(79,195,247,0.2); }
+  .mobileJoystick { display: none; position: fixed; bottom: calc(30px + env(safe-area-inset-bottom)); width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 60%, transparent 80%); border: 2px solid rgba(255,255,255,0.2); z-index: 50; touch-action: none; backdrop-filter: blur(10px); box-shadow: inset 0 0 30px rgba(0,0,0,0.5); transition: all 0.2s; }
+  .mobileJoystick.p1 { left: 25px; border-color: rgba(79,195,247,0.6); box-shadow: 0 0 25px rgba(79,195,247,0.5), inset 0 0 30px rgba(79,195,247,0.15); }
+  .mobileJoystick.p2 { right: 25px; border-color: rgba(255,107,107,0.6); box-shadow: 0 0 25px rgba(255,107,107,0.5), inset 0 0 30px rgba(255,107,107,0.15); }
+  .mobileJoystick .stick { position: absolute; top: 50%; left: 50%; width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(200,220,240,0.65) 40%, rgba(80,100,140,0.55) 100%); transform: translate(-50%, -50%); pointer-events: none; border: 2px solid rgba(255,255,255,0.4); transition: box-shadow 0.15s; }
+  .mobileJoystick.p1 .stick { box-shadow: 0 0 20px rgba(79,195,247,0.9), 0 4px 12px rgba(0,0,0,0.6); }
+  .mobileJoystick.p2 .stick { box-shadow: 0 0 20px rgba(255,107,107,0.9), 0 4px 12px rgba(0,0,0,0.6); }
+  .mobileJoystick .arrow { position: absolute; color: rgba(255,255,255,0.35); font-size: 1.1em; font-weight: bold; pointer-events: none; transition: all 0.15s; }
+  .mobileJoystick .arrow.up    { top: 6px;    left: 50%; transform: translateX(-50%); }
+  .mobileJoystick .arrow.down  { bottom: 6px; left: 50%; transform: translateX(-50%); }
+  .mobileJoystick .arrow.left  { left: 6px;   top: 50%;  transform: translateY(-50%); }
+  .mobileJoystick .arrow.right { right: 6px;  top: 50%;  transform: translateY(-50%); }
+  .mobileJoystick.active .arrow { color: rgba(255,255,255,0.85); }
+  .mobileFireBtn { display: none; position: fixed; bottom: calc(40px + env(safe-area-inset-bottom)); width: 95px; height: 95px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffb3b3 0%, #ff6b6b 30%, #cc0000 80%); border: 3px solid rgba(255,180,180,0.8); box-shadow: 0 0 30px rgba(255,107,107,0.7), 0 6px 20px rgba(0,0,0,0.5); color: #fff; font-size: 2.2em; z-index: 50; align-items: center; justify-content: center; touch-action: none; user-select: none; transition: transform 0.08s, box-shadow 0.1s; font-weight: bold; }
+  .mobileFireBtn.p1 { right: 30px; }
+  .mobileFireBtn.p2 { left: 30px; }
+  .mobileFireBtn:active, .mobileFireBtn.pressed { transform: scale(0.9); box-shadow: 0 0 50px rgba(255,107,107,1), 0 0 80px rgba(255,107,107,0.6); }
+  .overlay { position: fixed; inset: 0; background: radial-gradient(circle at 50% 40%, rgba(20,30,55,0.95) 0%, rgba(5,8,16,0.98) 70%); backdrop-filter: blur(15px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; overflow-y: auto; }
+  .overlay.hidden { display: none; }
+  .overlay h1 { font-size: 3em; margin-bottom: 15px; background: linear-gradient(90deg, #4fc3f7 0%, #00e5ff 30%, #ffd54f 50%, #00e5ff 70%, #4fc3f7 100%); background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shine 4s linear infinite; letter-spacing: 4px; font-weight: 800; }
+  @keyframes shine { to { background-position: 300% center; } }
+  .overlay h2 { font-size: 1.8em; margin-bottom: 15px; color: #4fc3f7; letter-spacing: 2px; font-weight: 700; }
+  .overlay p { font-size: 1em; color: #a0b8d0; margin-bottom: 15px; max-width: 500px; line-height: 1.6; }
+  .overlay button { padding: 16px 36px; font-size: 1.05em; font-weight: 700; letter-spacing: 1.5px; border: none; border-radius: 14px; cursor: pointer; color: #fff; background: linear-gradient(135deg, #4fc3f7, #0288d1); box-shadow: 0 6px 20px rgba(79,195,247,0.4); text-transform: uppercase; font-family: inherit; margin: 6px; min-height: 52px; transition: all 0.3s ease; }
+  .overlay button:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(79,195,247,0.6); }
+  .overlay button:active { transform: translateY(0); }
+  .overlay button.danger { background: linear-gradient(135deg, #ff6b6b, #cc0000); box-shadow: 0 6px 20px rgba(255,107,107,0.4); }
+  .overlay button.success { background: linear-gradient(135deg, #66bb6a, #388e3c); box-shadow: 0 6px 20px rgba(102,187,106,0.4); }
+  .overlay button.gold { background: linear-gradient(135deg, #ffd54f, #f57c00); box-shadow: 0 6px 20px rgba(255,213,79,0.5); color: #1a1a1a; }
+  .menu-buttons { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-top: 15px; width: 100%; max-width: 500px; }
+  .menu-buttons button { flex: 1 1 200px; max-width: 240px; }
+  .room-code-box { background: linear-gradient(135deg, rgba(79,195,247,0.15), rgba(0,229,255,0.08)); border: 2px dashed rgba(79,195,247,0.6); border-radius: 18px; padding: 22px 35px; margin: 20px 0; font-size: 2.8em; font-weight: 800; letter-spacing: 10px; color: #00e5ff; text-shadow: 0 0 20px rgba(0,229,255,0.9); animation: pulse-glow 2s ease-in-out infinite; word-break: break-all; font-family: 'Courier New', monospace; }
+  @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 30px rgba(0,229,255,0.4); } 50% { box-shadow: 0 0 60px rgba(0,229,255,0.8); } }
+  .copy-box { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 15px 0; flex-wrap: wrap; width: 100%; max-width: 500px; }
+  .copy-box input { padding: 14px 18px; font-size: 0.85em; border-radius: 10px; border: 2px solid rgba(79,195,247,0.4); background: rgba(10,20,40,0.8); color: #a0c8e0; flex: 1; min-width: 200px; font-family: monospace; outline: none; }
+  .input-group { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
+  input.codeInput { padding: 16px 24px; font-size: 1.4em; border-radius: 14px; border: 2px solid rgba(79,195,247,0.5); background: rgba(10,20,40,0.8); color: #fff; outline: none; text-align: center; letter-spacing: 8px; font-weight: 800; text-transform: uppercase; width: 250px; font-family: 'Courier New', monospace; }
+  input.codeInput:focus { border-color: #4fc3f7; box-shadow: 0 0 30px rgba(79,195,247,0.6); }
+  .controls-info { background: linear-gradient(135deg, rgba(20,30,55,0.9), rgba(15,20,40,0.95)); border: 1px solid rgba(79,195,247,0.3); border-radius: 18px; padding: 22px 28px; margin: 15px 0; max-width: 520px; text-align: left; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.5); backdrop-filter: blur(15px); }
+  .controls-info h3 { color: #4fc3f7; margin-bottom: 15px; text-align: center; font-size: 0.9em; letter-spacing: 3px; font-weight: 700; text-transform: uppercase; }
+  .controls-info .row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85em; gap: 10px; flex-wrap: wrap; }
+  .controls-info .row:last-child { border-bottom: none; }
+  .controls-info .key { background: linear-gradient(180deg, rgba(79,195,247,0.25), rgba(79,195,247,0.1)); border: 1px solid rgba(79,195,247,0.5); border-bottom-width: 2px; padding: 3px 10px; border-radius: 6px; font-family: 'Courier New', monospace; color: #7fdbff; font-weight: 700; display: inline-block; margin: 1px; font-size: 0.9em; }
+  .controls-info .p1 { color: #4fc3f7; font-weight: 700; }
+  .controls-info .p2 { color: #ff6b6b; font-weight: 700; }
+  .notification { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); background: linear-gradient(135deg, rgba(79,195,247,0.98), rgba(2,136,209,0.98)); padding: 35px 60px; border-radius: 24px; font-size: 1.8em; font-weight: 800; z-index: 200; box-shadow: 0 25px 70px rgba(0,0,0,0.7); text-align: center; pointer-events: none; transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); max-width: 90vw; letter-spacing: 2px; }
+  .notification.show { transform: translate(-50%, -50%) scale(1); }
+  .roundBanner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5); z-index: 150; text-align: center; pointer-events: none; opacity: 0; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+  .roundBanner.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .roundBanner h1 { font-size: 3.5em; margin-bottom: 15px; letter-spacing: 4px; font-weight: 800; text-shadow: 0 0 40px currentColor, 0 0 80px currentColor; animation: bannerPulse 0.8s ease-in-out infinite alternate; }
+  @keyframes bannerPulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+  .roundBanner .subtitle { font-size: 1.2em; color: #a0b8d0; letter-spacing: 2px; font-weight: 600; }
+  .roundBanner .countdown { font-size: 4em; font-weight: 800; color: #ffd54f; margin-top: 20px; text-shadow: 0 0 40px rgba(255,213,79,0.9); animation: countPulse 1s ease-in-out infinite; }
+  @keyframes countPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  .soundBtn { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 2px solid rgba(102,187,106,0.7); color: #fff; font-size: 1.2em; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 20; backdrop-filter: blur(10px); box-shadow: 0 0 20px rgba(102,187,106,0.4); }
+  .soundBtn.muted { border-color: rgba(117,117,117,0.6); box-shadow: none; background: rgba(0,0,0,0.4); }
+  .loader { display: inline-block; width: 50px; height: 50px; border: 4px solid rgba(79,195,247,0.2); border-top-color: #4fc3f7; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; box-shadow: 0 0 30px rgba(79,195,247,0.4); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  body.is-mobile .mobileJoystick { display: block; }
+  body.is-mobile .mobileFireBtn { display: flex; }
+  body.is-mobile.online-p1 .mobileJoystick.p2,
+  body.is-mobile.online-p1 .mobileFireBtn.p2 { display: none !important; }
+  body.is-mobile.online-p2 .mobileJoystick.p1,
+  body.is-mobile.online-p2 .mobileFireBtn.p1 { display: none !important; }
+  @media (max-width: 600px) {
+    .topBar { padding: 8px 12px; }
+    .player-score { padding: 5px 12px; font-size: 0.8em; }
+    .player-score .score { font-size: 1.3em; }
+    .overlay h1 { font-size: 2em; letter-spacing: 2px; }
+    .overlay h2 { font-size: 1.4em; }
+    .overlay p { font-size: 0.9em; }
+    .room-code-box { font-size: 1.9em; letter-spacing: 6px; padding: 18px 24px; }
+    .mobileJoystick { width: 120px; height: 120px; }
+    .mobileJoystick .stick { width: 56px; height: 56px; }
+    .mobileFireBtn { width: 80px; height: 80px; font-size: 1.9em; }
+    .controls-info { padding: 15px 20px; }
+    .menu-buttons button { flex: 1 1 100%; max-width: 100%; }
+    .roundBanner h1 { font-size: 2.2em; }
+    .roundBanner .countdown { font-size: 3em; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .mobileJoystick { width: 100px; height: 100px; bottom: 15px; }
+    .mobileJoystick .stick { width: 46px; height: 46px; }
+    .mobileFireBtn { width: 70px; height: 70px; font-size: 1.6em; bottom: 20px; }
+    .topBar { padding: 4px 10px; }
+    .player-score { padding: 3px 10px; font-size: 0.75em; }
+    .overlay h1 { font-size: 1.5em; }
+    .roundBanner h1 { font-size: 1.8em; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gameWrap">
+  <div class="topBar">
+    <div class="player-score p1" id="score1Box">
+      <span class="label">🔵 <span id="name1">P1</span></span>
+      <span class="score" id="score1">0</span>
+    </div>
+    <div class="round-info">
+      <div class="round-label">МАТЧ</div>
+      <div class="round-value" id="roundNum">0 : 0</div>
+    </div>
+    <div class="player-score p2" id="score2Box">
+      <span class="label">🔴 <span id="name2">P2</span></span>
+      <span class="score" id="score2">0</span>
+    </div>
+    <button class="soundBtn" id="soundBtn" onclick="toggleSound()">🔊</button>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+</div>
+
+<div class="mobileJoystick p1" id="joyLeft">
+  <div class="arrow up">▲</div>
+  <div class="arrow down">▼</div>
+  <div class="arrow left">◀</div>
+  <div class="arrow right">▶</div>
+  <div class="stick" id="stickLeft"></div>
+</div>
+<div class="mobileFireBtn p1" id="fireBtnLeft">💥</div>
+
+<div class="mobileJoystick p2" id="joyRight">
+  <div class="arrow up">▲</div>
+  <div class="arrow down">▼</div>
+  <div class="arrow left">◀</div>
+  <div class="arrow right">▶</div>
+  <div class="stick" id="stickRight"></div>
+</div>
+<div class="mobileFireBtn p2" id="fireBtnRight">💥</div>
+
+<div class="notification" id="notification"></div>
+
+<div class="roundBanner" id="roundBanner">
+  <h1 id="roundBannerTitle">🎯 РАУНД</h1>
+  <div class="subtitle" id="roundBannerSubtitle"></div>
+  <div class="countdown" id="roundBannerCountdown">3</div>
+</div>
+
+<div class="overlay" id="menuScreen">
+  <h1>🎮 ТАНЧИКИ</h1>
+  <p>Аркадный бой для двоих</p>
+
+  <div class="controls-info">
+    <h3>⚙ УПРАВЛЕНИЕ</h3>
+    <div class="row">
+      <span class="p1">🔵 Создатель игры</span>
+      <span><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> + <span class="key">ПРОБЕЛ</span></span>
+    </div>
+    <div class="row">
+      <span class="p2">🔴 Подключившийся</span>
+      <span><span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span> + <span class="key">ENTER</span></span>
+    </div>
+    <div class="row">
+      <span>📱 На телефоне</span>
+      <span>Джойстик и кнопка 💥 в разных углах</span>
+    </div>
+    <div class="row">
+      <span>🎯 Управление</span>
+      <span>Вверх = вверх, вниз = вниз (по карте)</span>
+    </div>
+  </div>
+
+  <div class="menu-buttons">
+    <button onclick="showCreateScreen()">🎮 СОЗДАТЬ ИГРУ</button>
+    <button onclick="showJoinScreen()">🔗 ПОДКЛЮЧИТЬСЯ</button>
+  </div>
+  <button class="gold" onclick="startSoloMode()" style="margin-top:10px">🎯 ИГРАТЬ ВДВОЁМ НА ОДНОМ УСТРОЙСТВЕ</button>
+</div>
+
+<div class="overlay hidden" id="createScreen">
+  <h2>🎮 Комната создана</h2>
+  <p>Отправьте другу код или ссылку</p>
+  <div class="room-code-box" id="roomCodeDisplay">...</div>
+  <div class="copy-box">
+    <input type="text" id="linkInput" readonly value="">
+    <button onclick="copyLink()">📋</button>
+  </div>
+  <div class="loader"></div>
+  <p id="waitingText" style="color:#4fc3f7">⏳ Ожидание подключения...</p>
+  <p style="color:#a0b8d0; font-size:0.9em; margin-top:10px">Вы играете 🔵 <b>синим</b> танком</p>
+  <button class="danger" onclick="backToMenu()">← НАЗАД</button>
+</div>
+
+<div class="overlay hidden" id="joinScreen">
+  <h2>🔗 Подключение</h2>
+  <p>Введите код комнаты</p>
+  <div class="input-group">
+    <input type="text" class="codeInput" id="joinCodeInput" maxlength="6" placeholder="ABC123" autocomplete="off">
+  </div>
+  <button onclick="joinGame()">🚀 ПОДКЛЮЧИТЬСЯ</button>
+  <div id="joinError" style="color:#ff6b6b; margin-top:15px; min-height:24px; font-weight:600;"></div>
+  <p style="color:#a0b8d0; font-size:0.9em; margin-top:10px">Вы играете 🔴 <b>красным</b> танком</p>
+  <button class="danger" onclick="backToMenu()">← НАЗАД</button>
+</div>
+
+<div class="overlay hidden" id="gameoverScreen">
+  <h1 id="gameoverTitle">🏆 КОНЕЦ</h1>
+  <p id="gameoverText"></p>
+  <button class="success" onclick="restartMatch()">🔄 ИГРАТЬ СНОВА</button>
+</div>
+
+<script>
+// ===================================================
+// WebRTC
+// ===================================================
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ]
+};
+
+// ===================================================
+// УСТРОЙСТВО
+// ===================================================
+const DeviceInfo = (function() {
+  const ua = navigator.userAgent || '';
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const isMobileUA = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop|Mobile/i.test(ua);
+  const isSmallScreen = window.innerWidth <= 900;
+  const isMobile = (isMobileUA || (isTouch && isSmallScreen));
+  const supportsVibrate = 'vibrate' in navigator;
+  return { isMobile, isTouch, isSmallScreen, supportsVibrate };
+})();
+
+if (DeviceInfo.isMobile) document.body.classList.add('is-mobile');
+if (DeviceInfo.isTouch) document.body.classList.add('is-touch');
+
+function vibrate(pattern) {
+  if (!DeviceInfo.supportsVibrate) return;
+  if (!Sound.enabled) return;
+  try { navigator.vibrate(pattern); } catch(e) {}
+}
+
+// ===================================================
+// ЗВУК
+// ===================================================
+const Sound = {
+  ctx: null, enabled: true, masterGain: null,
+  engineGain: null, engineOsc: null, engineOsc2: null, engineFilter: null, enginePlaying: false,
+
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.5;
+      this.masterGain.connect(this.ctx.destination);
+    } catch (e) { this.enabled = false; }
+  },
+
+  tone(freq, duration, type = 'sine', volume = 0.3, delay = 0) {
+    try {
+      if (!this.enabled || !this.ctx) return;
+      const t = this.ctx.currentTime + delay;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(volume, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+      osc.connect(gain); gain.connect(this.masterGain);
+      osc.start(t); osc.stop(t + duration + 0.05);
+    } catch(e) {}
+  },
+
+  sweep(f1, f2, dur, type = 'sine', vol = 0.3, delay = 0) {
+    try {
+      if (!this.enabled || !this.ctx) return;
+      const t = this.ctx.currentTime + delay;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(f1, t);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(f2, 1), t + dur);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(vol, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(gain); gain.connect(this.masterGain);
+      osc.start(t); osc.stop(t + dur + 0.05);
+    } catch(e) {}
+  },
+
+  noise(dur, vol = 0.3, freq = 1000, delay = 0, type = 'lowpass', Q = 1) {
+    try {
+      if (!this.enabled || !this.ctx) return;
+      const t = this.ctx.currentTime + delay;
+      const size = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
+      const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < size; i++) d[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = type;
+      filter.frequency.setValueAtTime(freq, t);
+      filter.Q.value = Q;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(vol, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+      src.start(t); src.stop(t + dur);
+    } catch(e) {}
+  },
+
+  playShoot() {
+    this.init();
+    try {
+      if (!this.ctx || !this.enabled) return;
+      const t = this.ctx.currentTime;
+      const osc1 = this.ctx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(140, t);
+      osc1.frequency.exponentialRampToValueAtTime(28, t + 0.35);
+      const g1 = this.ctx.createGain();
+      g1.gain.setValueAtTime(0, t);
+      g1.gain.linearRampToValueAtTime(0.75, t + 0.005);
+      g1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc1.connect(g1); g1.connect(this.masterGain);
+      osc1.start(t); osc1.stop(t + 0.5);
+
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(2400, t);
+      osc2.frequency.exponentialRampToValueAtTime(180, t + 0.12);
+      const g2 = this.ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(0.32, t + 0.003);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+      osc2.connect(g2); g2.connect(this.masterGain);
+      osc2.start(t); osc2.stop(t + 0.2);
+
+      const size = Math.floor(this.ctx.sampleRate * 0.28);
+      const buf = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+      const dd = buf.getChannelData(0);
+      for (let i = 0; i < size; i++) dd[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const bf = this.ctx.createBiquadFilter();
+      bf.type = 'bandpass';
+      bf.frequency.setValueAtTime(1400, t);
+      bf.frequency.exponentialRampToValueAtTime(400, t + 0.25);
+      bf.Q.value = 1.8;
+      const g3 = this.ctx.createGain();
+      g3.gain.setValueAtTime(0, t);
+      g3.gain.linearRampToValueAtTime(0.45, t + 0.008);
+      g3.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      src.connect(bf); bf.connect(g3); g3.connect(this.masterGain);
+      src.start(t); src.stop(t + 0.3);
+
+      const osc3 = this.ctx.createOscillator();
+      osc3.type = 'square';
+      osc3.frequency.setValueAtTime(3200, t);
+      osc3.frequency.exponentialRampToValueAtTime(600, t + 0.04);
+      const g4 = this.ctx.createGain();
+      g4.gain.setValueAtTime(0, t);
+      g4.gain.linearRampToValueAtTime(0.15, t + 0.002);
+      g4.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+      osc3.connect(g4); g4.connect(this.masterGain);
+      osc3.start(t); osc3.stop(t + 0.06);
+    } catch(e) {}
+  },
+
+  startEngine() {
+    try {
+      if (!this.enabled || !this.ctx || this.enginePlaying) return;
+      this.enginePlaying = true;
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineOsc.type = 'sawtooth';
+      this.engineOsc.frequency.value = 55;
+      this.engineOsc2 = this.ctx.createOscillator();
+      this.engineOsc2.type = 'square';
+      this.engineOsc2.frequency.value = 28;
+      this.engineFilter = this.ctx.createBiquadFilter();
+      this.engineFilter.type = 'lowpass';
+      this.engineFilter.frequency.value = 400;
+      this.engineFilter.Q.value = 5;
+      this.engineGain = this.ctx.createGain();
+      this.engineGain.gain.value = 0.05;
+      this.engineOsc.connect(this.engineFilter);
+      this.engineOsc2.connect(this.engineFilter);
+      this.engineFilter.connect(this.engineGain);
+      this.engineGain.connect(this.masterGain);
+      this.engineOsc.start();
+      this.engineOsc2.start();
+    } catch(e) { this.enginePlaying = false; }
+  },
+
+  updateEngine(speed) {
+    try {
+      if (!this.enabled || !this.ctx || !this.engineGain || !this.engineOsc) return;
+      const t = this.ctx.currentTime;
+      this.engineGain.gain.setValueAtTime(0.04 + speed * 0.14, t);
+      this.engineOsc.frequency.setValueAtTime(45 + speed * 55, t);
+      if (this.engineOsc2) this.engineOsc2.frequency.setValueAtTime(25 + speed * 30, t);
+      if (this.engineFilter) this.engineFilter.frequency.setValueAtTime(300 + speed * 500, t);
+    } catch(e) {}
+  },
+
+  stopEngine() {
+    if (!this.enginePlaying) return;
+    this.enginePlaying = false;
+    try { this.engineGain.gain.setValueAtTime(0, this.ctx.currentTime); } catch(e){}
+    setTimeout(() => {
+      try { this.engineOsc && this.engineOsc.stop(); } catch(e){}
+      try { this.engineOsc2 && this.engineOsc2.stop(); } catch(e){}
+      this.engineOsc = null; this.engineOsc2 = null;
+      this.engineGain = null; this.engineFilter = null;
+    }, 200);
+  },
+
+  playExplosion() {
+    this.init();
+    this.tone(55, 0.7, 'sine', 0.6, 0);
+    this.tone(38, 0.9, 'sine', 0.5, 0.03);
+    this.noise(0.55, 0.45, 700, 0, 'lowpass', 1.5);
+    this.noise(0.35, 0.3, 2500, 0.05, 'highpass', 0.5);
+    this.sweep(1800, 80, 0.35, 'square', 0.2);
+  },
+  playWallHit() {
+    this.init();
+    this.tone(200, 0.1, 'square', 0.18);
+    this.noise(0.1, 0.18, 1200, 0, 'bandpass', 0.8);
+  },
+  playBounce() {
+    this.init();
+    this.tone(1300, 0.06, 'sine', 0.18);
+    this.sweep(1500, 800, 0.1, 'sine', 0.12);
+  },
+  playClick() {
+    this.init();
+    this.tone(1500, 0.05, 'sine', 0.12);
+  },
+  playRoundStart() {
+    this.init();
+    this.tone(660, 0.15, 'sine', 0.3, 0);
+    this.tone(880, 0.15, 'sine', 0.3, 0.12);
+    this.tone(1320, 0.25, 'sine', 0.35, 0.24);
+  },
+  playCountdown() {
+    this.init();
+    this.tone(880, 0.1, 'square', 0.15);
+  },
+  playRoundWin() {
+    this.init();
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.35, 'triangle', 0.35, i * 0.1));
+  },
+  playRoundLose() {
+    this.init();
+    [523.25, 415.3, 349.23].forEach((f, i) => this.tone(f, 0.4, 'triangle', 0.3, i * 0.15));
+  },
+  playVictory() {
+    this.init();
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => this.tone(f, 0.4, 'triangle', 0.4, i * 0.15));
+    this.tone(1567.98, 1.2, 'sine', 0.35, 0.8);
+  }
+};
+
+function toggleSound() {
+  Sound.init();
+  Sound.enabled = !Sound.enabled;
+  const btn = document.getElementById('soundBtn');
+  if (Sound.enabled) {
+    btn.textContent = '🔊';
+    btn.classList.remove('muted');
+    Sound.playClick();
+    if (G.phase === 'playing') Sound.startEngine();
+  } else {
+    btn.textContent = '🔇';
+    btn.classList.add('muted');
+    Sound.stopEngine();
+  }
+}
+document.addEventListener('click', () => Sound.init(), { once: true });
+
+// ===================================================
+// КОНСТАНТЫ
+// ===================================================
+const TILE_SIZE = 40;
+const MAP_SIZE = 15;
+const CANVAS_SIZE = TILE_SIZE * MAP_SIZE;
+const TANK_SIZE = 32;
+const TANK_SPEED = 2.2;
+const BULLET_SPEED = 5.5;
+const BULLET_SIZE = 9;
+const BULLET_MAX_BOUNCES = 2;
+const WALL_HP_MAX = 3;
+const FIRE_COOLDOWN = 450;
+const ROUND_DELAY = 3;
+
+const TANK_START = {
+  p1: { x: TILE_SIZE * 1.5, y: TILE_SIZE * 1.5, angle: Math.PI / 4 },
+  p2: { x: CANVAS_SIZE - TILE_SIZE * 1.5, y: CANVAS_SIZE - TILE_SIZE * 1.5, angle: -Math.PI * 3 / 4 }
+};
+
+const CELL_EMPTY = 0;
+const CELL_WALL  = 1;
+const CELL_STEEL = 2;
+
+// ===================================================
+// КАРТЫ
+// ===================================================
+const MAPS = [
+  [
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,4,0,0,3,0,0,0,0,5,0,0,4,0,2],
+    [2,0,5,0,0,0,1,0,0,0,3,0,0,0,2],
+    [2,3,0,1,1,0,1,0,1,1,0,0,5,4,2],
+    [2,0,0,1,0,5,0,0,0,1,0,3,0,0,2],
+    [2,0,4,0,0,0,1,0,0,0,5,0,1,0,2],
+    [2,0,0,0,0,1,1,1,0,4,0,0,1,0,2],
+    [2,5,0,0,0,0,1,0,0,0,0,3,1,0,2],
+    [2,0,0,0,3,0,0,0,5,0,0,0,0,4,2],
+    [2,0,0,1,0,0,4,0,0,1,0,0,1,0,2],
+    [2,0,0,1,1,0,1,0,3,1,0,5,0,0,2],
+    [2,4,0,0,0,0,1,0,0,0,0,0,0,3,2],
+    [2,0,5,0,0,3,0,0,0,0,0,1,0,0,2],
+    [2,0,0,0,4,0,0,5,0,0,0,0,3,0,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+  ],
+  [
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,4,0,0,5,0,0,3,0,0,0,0,4,0,2],
+    [2,0,1,1,0,1,0,1,0,1,0,1,1,5,2],
+    [2,0,5,0,0,1,4,1,0,1,3,0,0,0,2],
+    [2,0,1,0,1,1,0,1,0,1,1,0,1,0,2],
+    [2,4,0,0,3,0,0,5,0,0,0,4,0,0,2],
+    [2,1,1,0,1,0,1,1,1,0,1,0,1,1,2],
+    [2,0,0,5,0,0,0,4,0,0,0,0,3,0,2],
+    [2,1,1,0,1,0,1,1,1,0,1,0,1,1,2],
+    [2,0,3,0,0,5,0,0,4,0,0,0,0,0,2],
+    [2,5,1,0,1,1,0,1,0,1,1,0,1,4,2],
+    [2,0,0,4,0,1,0,1,3,1,0,0,0,0,2],
+    [2,0,1,1,0,1,0,1,0,1,0,1,1,5,2],
+    [2,4,0,0,0,0,3,0,0,5,0,0,0,0,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+  ],
+  [
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+    [2,0,4,0,5,1,0,0,0,1,0,3,0,4,2],
+    [2,0,1,0,0,1,3,0,0,1,0,0,1,5,2],
+    [2,3,1,0,5,0,0,1,0,0,4,0,1,0,2],
+    [2,0,1,0,1,1,0,1,0,1,1,0,1,0,2],
+    [2,4,0,0,1,5,0,0,3,0,1,0,0,5,2],
+    [2,1,0,1,0,0,1,1,1,0,0,1,0,1,2],
+    [2,1,0,1,0,4,1,0,1,3,0,1,0,1,2],
+    [2,1,0,1,0,0,1,1,1,0,5,1,0,1,2],
+    [2,0,5,0,1,0,4,0,0,0,1,0,4,0,2],
+    [2,0,1,3,1,1,0,1,0,1,1,0,1,0,2],
+    [2,5,1,0,0,4,0,1,3,0,0,0,1,0,2],
+    [2,0,1,0,4,1,0,0,0,1,0,0,1,5,2],
+    [2,0,0,3,0,1,5,0,0,1,0,4,0,0,2],
+    [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
+  ]
+];
+
+function isFoliage(cell) { return cell === 3 || cell === 4 || cell === 5; }
+function isBlocking(cell) { return cell === CELL_WALL || cell === CELL_STEEL; }
+
+// ===================================================
+// СОСТОЯНИЕ
+// ===================================================
+const G = {
+  phase: 'menu',
+  mode: 'solo',
+  myRole: null,
+  isHost: false,
+  peer: null,
+  conn: null,
+  roomCode: '',
+  connected: false,
+  map: [],
+  mapHP: [],
+  tanks: {},
+  bullets: [],
+  particles: [],
+  treads: [],
+  foliage: [],
+  score: { p1: 0, p2: 0 },
+  maxScore: 5,
+  canvas: null,
+  ctx: null,
+  lastTime: 0,
+  lastSyncTime: 0,
+  roundTimer: 0,
+  roundCountdown: 3,
+  currentMapIndex: -1
+};
+
+// ===================================================
+// INPUT
+// ===================================================
+const Input = {
+  keys: {},
+  initialized: false,
+  myJoystick: { x: 0, y: 0, active: false, id: null },
+  joystickRight: { x: 0, y: 0, active: false, id: null },
+  firePressedLeft: false,
+  firePressedRight: false,
+
+  init() {
+    if (this.initialized) return;
+    this.initialized = true;
+    document.addEventListener('keydown', (e) => {
+      this.keys[e.key.toLowerCase()] = true;
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    });
+    document.addEventListener('keyup', (e) => {
+      this.keys[e.key.toLowerCase()] = false;
+    });
+
+    if (DeviceInfo.isTouch) {
+      if (G.mode === 'solo') {
+        this.setupJoystick('joyLeft', 'stickLeft', 'myJoystick');
+        this.setupJoystick('joyRight', 'stickRight', 'joystickRight');
+      } else {
+        if (G.myRole === 'p1') {
+          this.setupJoystick('joyLeft', 'stickLeft', 'myJoystick');
+        } else if (G.myRole === 'p2') {
+          this.setupJoystick('joyRight', 'stickRight', 'myJoystick');
+        }
+      }
+      this.setupFireButton('fireBtnLeft', 'firePressedLeft');
+      this.setupFireButton('fireBtnRight', 'firePressedRight');
+    }
+  },
+
+  setupJoystick(joyId, stickId, stateKey) {
+    const joy = document.getElementById(joyId);
+    const stick = document.getElementById(stickId);
+    const state = this[stateKey];
+    const maxDist = 45;
+
+    const updatePos = (t) => {
+      const rect = joy.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = t.clientX - cx;
+      let dy = t.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxDist) {
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
+      }
+      state.x = dx / maxDist;
+      state.y = dy / maxDist;
+      stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      joy.classList.add('active');
+    };
+
+    joy.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      state.id = t.identifier;
+      state.active = true;
+      updatePos(t);
+    }, { passive: false });
+
+    joy.addEventListener('touchmove', (e) => {
+      if (!state.active) return;
+      e.preventDefault();
+      for (const t of e.touches) {
+        if (t.identifier === state.id) updatePos(t);
+      }
+    }, { passive: false });
+
+    const end = (e) => {
+      e.preventDefault();
+      state.active = false;
+      state.id = null;
+      state.x = 0;
+      state.y = 0;
+      stick.style.transform = 'translate(-50%, -50%)';
+      joy.classList.remove('active');
+    };
+    joy.addEventListener('touchend', end, { passive: false });
+    joy.addEventListener('touchcancel', end, { passive: false });
+  },
+
+  setupFireButton(btnId, stateKey) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressed');
+      this[stateKey] = true;
+    }, { passive: false });
+    btn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      btn.classList.remove('pressed');
+      this[stateKey] = false;
+    }, { passive: false });
+    btn.addEventListener('touchcancel', (e) => {
+      e.preventDefault();
+      btn.classList.remove('pressed');
+      this[stateKey] = false;
+    }, { passive: false });
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      btn.classList.add('pressed');
+      this[stateKey] = true;
+    });
+    btn.addEventListener('mouseup', (e) => {
+      e.preventDefault();
+      btn.classList.remove('pressed');
+      this[stateKey] = false;
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.classList.remove('pressed');
+      this[stateKey] = false;
+    });
+  },
+
+  getMoveVector(tankId) {
+    if (DeviceInfo.isTouch) {
+      let joy = null;
+      if (G.mode === 'solo') {
+        joy = (tankId === 'p1') ? this.myJoystick : this.joystickRight;
+      } else {
+        if (tankId === G.myRole) joy = this.myJoystick;
+        else return { x: 0, y: 0, active: false };
+      }
+
+      if (!joy || !joy.active) return { x: 0, y: 0, active: false };
+
+      let x = Math.abs(joy.x) > 0.25 ? joy.x : 0;
+      let y = Math.abs(joy.y) > 0.25 ? joy.y : 0;
+
+      return { x, y, active: true };
+    }
+
+    const keys = this.keys;
+    let vx = 0, vy = 0;
+
+    if (tankId === 'p1') {
+      if (keys['w']) vy -= 1;
+      if (keys['s']) vy += 1;
+      if (keys['a']) vx -= 1;
+      if (keys['d']) vx += 1;
+    } else if (tankId === 'p2') {
+      if (keys['arrowup']) vy -= 1;
+      if (keys['arrowdown']) vy += 1;
+      if (keys['arrowleft']) vx -= 1;
+      if (keys['arrowright']) vx += 1;
+    }
+
+    return { x: vx, y: vy, active: (vx !== 0 || vy !== 0) };
+  },
+
+  isFirePressed(tankId) {
+    if (DeviceInfo.isTouch) {
+      if (G.mode === 'solo') {
+        if (tankId === 'p1') return this.firePressedLeft;
+        if (tankId === 'p2') return this.firePressedRight;
+      }
+      if (tankId === G.myRole) {
+        return G.myRole === 'p1' ? this.firePressedLeft : this.firePressedRight;
+      }
+      return false;
+    }
+
+    if (tankId === 'p1') return !!this.keys[' '];
+    if (tankId === 'p2') return !!this.keys['enter'];
+    return false;
+  }
+};
+
+// ===================================================
+// ТАНК
+// ===================================================
+class Tank {
+  constructor(id, x, y, angle, color, isLocalInput) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.turretAngle = angle;
+    this.color = color;
+    this.isLocalInput = isLocalInput;
+    this.alive = true;
+    this.trackOffset = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.lastFireTime = 0;
+    this.speedFactor = 0;
+    this.recoil = 0;
+  }
+
+  update(dt) {
+    if (!this.alive) { this.speedFactor = 0; return; }
+
+    if (G.phase !== 'playing') {
+      this.vx = 0;
+      this.vy = 0;
+      this.speedFactor = Math.max(0, this.speedFactor - dt * 3);
+      if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 5);
+      return;
+    }
+
+    // 🎯 Гость НЕ управляет снарядами — только двигает свой танк и отправляет позицию
+    let moveVec = { x: 0, y: 0, active: false };
+    if (this.isLocalInput) moveVec = Input.getMoveVector(this.id);
+
+    if (moveVec.active && (moveVec.x !== 0 || moveVec.y !== 0)) {
+      const mag = Math.hypot(moveVec.x, moveVec.y);
+      const nx = moveVec.x / mag;
+      const ny = moveVec.y / mag;
+
+      this.vx = nx * TANK_SPEED;
+      this.vy = ny * TANK_SPEED;
+
+      const newX = this.x + this.vx;
+      const newY = this.y + this.vy;
+
+      if (!this.collides(newX, this.y)) this.x = newX;
+      if (!this.collides(this.x, newY)) this.y = newY;
+
+      this.trackOffset += 0.3;
+      this.speedFactor = Math.min(1, this.speedFactor + dt * 3);
+
+      const moveAngle = Math.atan2(this.vx, -this.vy);
+      let diff = moveAngle - this.angle;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      this.angle += Math.sign(diff) * Math.min(Math.abs(diff), 0.15);
+    } else {
+      this.vx = 0;
+      this.vy = 0;
+      this.speedFactor = Math.max(0, this.speedFactor - dt * 3);
+    }
+
+    this.turretAngle = this.angle;
+
+    const half = TANK_SIZE / 2;
+    this.x = Math.max(half, Math.min(CANVAS_SIZE - half, this.x));
+    this.y = Math.max(half, Math.min(CANVAS_SIZE - half, this.y));
+
+    if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 5);
+
+    // 🎯 Стрельба: и хост, и гость могут стрелять
+    if (this.isLocalInput && Input.isFirePressed(this.id)) {
+      this.tryShoot();
+    }
+  }
+
+  tryShoot() {
+    const now = performance.now();
+    if (now - this.lastFireTime < FIRE_COOLDOWN) return;
+    this.lastFireTime = now;
+    this.recoil = 1;
+
+    // Гость создаёт снаряд локально только для анимации, но НЕ считает попадания
+    // (попадания считает хост)
+    if (G.mode === 'online' && !G.isHost && this.id === G.myRole) {
+      // Гость отправляет выстрел хосту — хост создаст снаряд
+      const angle = this.turretAngle;
+      const sx = this.x + Math.sin(angle) * (TANK_SIZE / 2 + 4);
+      const sy = this.y - Math.cos(angle) * (TANK_SIZE / 2 + 4);
+      sendMessage({ type: 'shootRequest', x: sx, y: sy, angle, shooter: this.id });
+      Sound.playShoot();
+      vibrate(20);
+      spawnParticles(sx, sy, 'muzzle', this.color.main);
+    } else {
+      // Хост или solo — создаём снаряд сразу
+      fireBulletFrom(this);
+
+      if (G.mode === 'online' && G.isHost) {
+        // Хост синхронизирует создание снаряда с гостем
+        const angle = this.turretAngle;
+        const sx = this.x + Math.sin(angle) * (TANK_SIZE / 2 + 4);
+        const sy = this.y - Math.cos(angle) * (TANK_SIZE / 2 + 4);
+        sendMessage({ type: 'spawnBullet', x: sx, y: sy, angle, owner: this.id });
+      }
+    }
+  }
+
+  collides(x, y) {
+    const half = TANK_SIZE / 2 - 2;
+    const corners = [
+      [x - half, y - half], [x + half, y - half],
+      [x - half, y + half], [x + half, y + half]
+    ];
+    for (const [cx, cy] of corners) {
+      const col = Math.floor(cx / TILE_SIZE);
+      const row = Math.floor(cy / TILE_SIZE);
+      if (row < 0 || row >= MAP_SIZE || col < 0 || col >= MAP_SIZE) return true;
+      if (isBlocking(G.map[row][col])) return true;
+    }
+    return false;
+  }
+
+  draw(ctx) {
+    if (!this.alive) return;
+    const recoilOffset = this.recoil * 3;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    ctx.save();
+    ctx.rotate(this.angle);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(-TANK_SIZE/2 + 3, -TANK_SIZE/2 + 5, TANK_SIZE, TANK_SIZE);
+    ctx.restore();
+
+    ctx.save();
+    ctx.rotate(this.angle);
+
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(-TANK_SIZE/2, -TANK_SIZE/2, 8, TANK_SIZE);
+    ctx.fillRect(TANK_SIZE/2 - 8, -TANK_SIZE/2, 8, TANK_SIZE);
+
+    ctx.fillStyle = '#2a2a2a';
+    const segOffset = (this.trackOffset % 8);
+    for (let i = -TANK_SIZE/2; i < TANK_SIZE/2 - 3; i += 8) {
+      ctx.fillRect(-TANK_SIZE/2 + 1, i + segOffset, 6, 4);
+      ctx.fillRect(TANK_SIZE/2 - 7, i + segOffset, 6, 4);
+    }
+
+    const grad = ctx.createLinearGradient(-TANK_SIZE/2, -TANK_SIZE/2, TANK_SIZE/2, TANK_SIZE/2);
+    grad.addColorStop(0, this.color.light);
+    grad.addColorStop(0.35, this.color.main);
+    grad.addColorStop(0.7, this.color.main);
+    grad.addColorStop(1, this.color.dark);
+    ctx.fillStyle = grad;
+    ctx.fillRect(-TANK_SIZE/2 + 7, -TANK_SIZE/2 + 4, TANK_SIZE - 14, TANK_SIZE - 8);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(-TANK_SIZE/2 + 7, -TANK_SIZE/2 + 4, TANK_SIZE - 14, 3);
+
+    ctx.strokeStyle = this.color.dark;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-TANK_SIZE/2 + 7, -TANK_SIZE/2 + 4, TANK_SIZE - 14, TANK_SIZE - 8);
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-TANK_SIZE/2 + 10, -3);
+    ctx.lineTo(TANK_SIZE/2 - 10, -3);
+    ctx.moveTo(-TANK_SIZE/2 + 10, 3);
+    ctx.lineTo(TANK_SIZE/2 - 10, 3);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.save();
+    ctx.rotate(this.turretAngle);
+    ctx.translate(0, recoilOffset);
+
+    const turretGrad = ctx.createRadialGradient(-4, -4, 2, 0, 0, 14);
+    turretGrad.addColorStop(0, this.color.light);
+    turretGrad.addColorStop(0.5, this.color.main);
+    turretGrad.addColorStop(1, this.color.dark);
+    ctx.fillStyle = turretGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = this.color.dark;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.arc(-3, -3, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    const barrelGrad = ctx.createLinearGradient(-3, 0, 3, 0);
+    barrelGrad.addColorStop(0, this.color.dark);
+    barrelGrad.addColorStop(0.5, this.color.main);
+    barrelGrad.addColorStop(1, this.color.dark);
+    ctx.fillStyle = barrelGrad;
+    ctx.fillRect(-3, -TANK_SIZE/2 - 8, 6, TANK_SIZE/2 + 8);
+
+    ctx.fillStyle = this.color.dark;
+    ctx.fillRect(-5, -TANK_SIZE/2 - 2, 10, 9);
+
+    ctx.fillStyle = this.color.light;
+    ctx.fillRect(-4, -TANK_SIZE/2 + 8, 8, 2);
+
+    ctx.restore();
+    ctx.restore();
+  }
+}
+
+// ===================================================
+// ПУЛИ
+// ===================================================
+function fireBulletFrom(tank) {
+  const angle = tank.turretAngle;
+  const sx = tank.x + Math.sin(angle) * (TANK_SIZE / 2 + 4);
+  const sy = tank.y - Math.cos(angle) * (TANK_SIZE / 2 + 4);
+
+  G.bullets.push({
+    x: sx, y: sy,
+    vx: Math.sin(angle) * BULLET_SPEED,
+    vy: -Math.cos(angle) * BULLET_SPEED,
+    owner: tank.id,
+    bounces: 0,
+    alive: true,
+    trail: []
+  });
+
+  Sound.playShoot();
+  vibrate(20);
+  spawnParticles(sx, sy, 'muzzle', tank.color.main);
+}
+
+function createBullet(x, y, angle, owner) {
+  G.bullets.push({
+    x, y,
+    vx: Math.sin(angle) * BULLET_SPEED,
+    vy: -Math.cos(angle) * BULLET_SPEED,
+    owner: owner,
+    bounces: 0,
+    alive: true,
+    trail: []
+  });
+  // Звук и частицы для выстрела противника (свой уже проигран в tryShoot)
+  if (G.mode === 'online' && owner !== G.myRole) {
+    Sound.playShoot();
+    const tank = G.tanks[owner];
+    spawnParticles(x, y, 'muzzle', tank ? tank.color.main : '#fff');
+  }
+}
+
+function updateBullets(dt) {
+  const speedFactor = 60 * dt;
+
+  for (const b of G.bullets) {
+    if (!b.alive) continue;
+
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > 10) b.trail.shift();
+
+    const steps = 4;
+    for (let s = 0; s < steps; s++) {
+      if (!b.alive) break;
+      const stepX = b.vx * speedFactor / steps;
+      const stepY = b.vy * speedFactor / steps;
+      const newX = b.x + stepX;
+      const newY = b.y + stepY;
+
+      // 🎯 В онлайне попадания в танки считает ТОЛЬКО ХОСТ
+      const shouldCheckTanks = (G.mode !== 'online') || G.isHost;
+
+      if (shouldCheckTanks) {
+        let hitTank = null;
+        for (const id in G.tanks) {
+          const tank = G.tanks[id];
+          if (!tank.alive || id === b.owner) continue;
+          const dx = tank.x - newX;
+          const dy = tank.y - newY;
+          if (Math.hypot(dx, dy) < TANK_SIZE / 2 + BULLET_SIZE / 2) {
+            hitTank = tank;
+            break;
+          }
+        }
+
+        if (hitTank) {
+          b.alive = false;
+
+          // Урон танку — на хосте
+          hitTank.alive = false;
+          spawnParticles(hitTank.x, hitTank.y, 'bigExplosion');
+          Sound.playExplosion();
+          vibrate([80, 30, 80]);
+
+          // Счёт
+          if (b.owner && G.score[b.owner] !== undefined) {
+            G.score[b.owner]++;
+            updateScoreDisplay();
+          }
+
+          // Отправляем гостю сообщение о смерти + новом счёте
+          if (G.mode === 'online') {
+            sendMessage({
+              type: 'tankDied',
+              tankId: hitTank.id,
+              killer: b.owner,
+              score: G.score
+            });
+          }
+
+          // Запуск перехода раунда на хосте
+          scheduleRoundEnd(b.owner);
+          break;
+        }
+      }
+
+      const col = Math.floor(newX / TILE_SIZE);
+      const row = Math.floor(newY / TILE_SIZE);
+
+      if (row < 0 || row >= MAP_SIZE || col < 0 || col >= MAP_SIZE) {
+        b.alive = false;
+        break;
+      }
+
+      const cell = G.map[row][col];
+      if (cell === CELL_STEEL) {
+        b.bounces++;
+        if (b.bounces > BULLET_MAX_BOUNCES) {
+          b.alive = false;
+          spawnParticles(b.x, b.y, 'spark');
+          Sound.playBounce();
+          break;
+        }
+        const cellX = col * TILE_SIZE;
+        const cellY = row * TILE_SIZE;
+        const relX = newX - cellX;
+        const relY = newY - cellY;
+        const distLeft = relX, distRight = TILE_SIZE - relX;
+        const distTop = relY, distBottom = TILE_SIZE - relY;
+        const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+        if (minDist === distLeft || minDist === distRight) b.vx = -b.vx;
+        else b.vy = -b.vy;
+        b.x += b.vx * 0.5;
+        b.y += b.vy * 0.5;
+        Sound.playBounce();
+        spawnParticles(b.x, b.y, 'spark');
+        break;
+      } else if (cell === CELL_WALL) {
+        if (G.mode === 'solo' || G.isHost) {
+          G.mapHP[row][col]--;
+          if (G.mapHP[row][col] <= 0) {
+            G.map[row][col] = CELL_EMPTY;
+            Sound.playExplosion();
+            spawnParticles(col * TILE_SIZE + TILE_SIZE/2, row * TILE_SIZE + TILE_SIZE/2, 'explosion');
+            if (G.mode === 'online') sendMessage({ type: 'wall', row, col });
+          } else {
+            if (G.mode === 'online') sendMessage({ type: 'wallHp', row, col, hp: G.mapHP[row][col] });
+          }
+        }
+        spawnParticles(b.x, b.y, 'debris');
+        Sound.playWallHit();
+        b.alive = false;
+        break;
+      }
+
+      b.x = newX;
+      b.y = newY;
+    }
+  }
+
+  G.bullets = G.bullets.filter(b => b.alive);
+}
+
+function drawBullets(ctx) {
+  for (const b of G.bullets) {
+    for (let i = 0; i < b.trail.length; i++) {
+      const t = b.trail[i];
+      const a = (i / b.trail.length) * 0.5;
+      const size = BULLET_SIZE / 2 * (i / b.trail.length);
+      ctx.fillStyle = `rgba(255,200,50,${a})`;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.shadowColor = '#ffaa00';
+    ctx.shadowBlur = 20;
+
+    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, BULLET_SIZE);
+    grad.addColorStop(0, '#ffffaa');
+    grad.addColorStop(0.4, '#ffdd00');
+    grad.addColorStop(0.8, '#ff8800');
+    grad.addColorStop(1, 'rgba(255,68,0,0.2)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, BULLET_SIZE / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, BULLET_SIZE / 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+  }
+}
+
+// ===================================================
+// СМЕРТЬ / РАУНД
+// ===================================================
+let roundEndScheduled = false;
+
+function scheduleRoundEnd(winnerId) {
+  if (roundEndScheduled) return;
+  roundEndScheduled = true;
+
+  setTimeout(() => {
+    roundEndScheduled = false;
+    if (G.score.p1 >= G.maxScore) {
+      endGame('p1');
+      if (G.mode === 'online') sendMessage({ type: 'gameOver', winner: 'p1' });
+    } else if (G.score.p2 >= G.maxScore) {
+      endGame('p2');
+      if (G.mode === 'online') sendMessage({ type: 'gameOver', winner: 'p2' });
+    } else {
+      startRoundTransition(winnerId);
+      if (G.mode === 'online') sendMessage({ type: 'roundTransition', winnerId: winnerId, score: G.score });
+    }
+  }, 900);
+}
+
+function startRoundTransition(winnerId) {
+  G.phase = 'roundWait';
+  Sound.stopEngine();
+  engineWasPlaying = false;
+
+  const banner = document.getElementById('roundBanner');
+  const title = document.getElementById('roundBannerTitle');
+  const subtitle = document.getElementById('roundBannerSubtitle');
+  const countdownEl = document.getElementById('roundBannerCountdown');
+
+  if (G.mode === 'solo') {
+    if (winnerId === 'p1') {
+      title.textContent = '🔵 СИНИЙ ПОБЕДИЛ';
+      title.style.color = '#4fc3f7';
+    } else if (winnerId === 'p2') {
+      title.textContent = '🔴 КРАСНЫЙ ПОБЕДИЛ';
+      title.style.color = '#ff6b6b';
+    } else {
+      title.textContent = '🎯 НОВЫЙ РАУНД';
+      title.style.color = '#4fc3f7';
+    }
+  } else {
+    const iWon = winnerId === G.myRole;
+    if (iWon) {
+      title.textContent = '🏆 ВЫ ПОБЕДИЛИ!';
+      title.style.color = '#66bb6a';
+      Sound.playRoundWin();
+    } else {
+      title.textContent = '💀 ВЫ ПРОИГРАЛИ';
+      title.style.color = '#ff6b6b';
+      Sound.playRoundLose();
+    }
+  }
+
+  subtitle.textContent = `Счёт: ${G.score.p1} : ${G.score.p2}`;
+  banner.classList.add('show');
+
+  G.roundTimer = ROUND_DELAY;
+  G.roundCountdown = Math.ceil(ROUND_DELAY);
+  countdownEl.textContent = G.roundCountdown;
+
+  Sound.playCountdown();
+}
+
+function updateRoundTransition(dt) {
+  if (G.phase !== 'roundWait') return;
+
+  G.roundTimer -= dt;
+  const countdown = Math.max(0, Math.ceil(G.roundTimer));
+
+  if (countdown !== G.roundCountdown) {
+    G.roundCountdown = countdown;
+    const el = document.getElementById('roundBannerCountdown');
+    if (el) el.textContent = countdown;
+    if (countdown > 0) {
+      Sound.playCountdown();
+      vibrate(30);
+    }
+  }
+
+  if (G.roundTimer <= 0) {
+    document.getElementById('roundBanner').classList.remove('show');
+
+    // 🎯 Только ХОСТ инициирует новый раунд
+    if (G.mode === 'online') {
+      if (G.isHost) {
+        const mapIndex = Math.floor(Math.random() * MAPS.length);
+        // Хост загружает карту и стартует
+        beginRoundWithMap(mapIndex);
+        // Отправляем гостю команду начать с той же картой
+        sendMessage({ type: 'startRound', mapIndex: mapIndex, score: G.score });
+      }
+      // Гость ждёт 'startRound'
+    } else {
+      const mapIndex = Math.floor(Math.random() * MAPS.length);
+      beginRoundWithMap(mapIndex);
+    }
+  }
+}
+
+function beginRoundWithMap(mapIndex) {
+  G.phase = 'playing';
+  G.bullets = [];
+  G.particles = [];
+  G.treads = [];
+  roundEndScheduled = false;
+
+  loadMap(mapIndex);
+  createTanks();
+
+  Sound.playRoundStart();
+  showNotification('🎯 РАУНД ' + (G.score.p1 + G.score.p2 + 1));
+  vibrate(50);
+}
+
+// ===================================================
+// ЧАСТИЦЫ
+// ===================================================
+function spawnParticles(x, y, type, colorOverride = null) {
+  const count = { muzzle: 10, spark: 8, debris: 12, explosion: 30, bigExplosion: 60 }[type] || 10;
+  const palette = {
+    muzzle: ['#ffff00', '#ffaa00', '#ff6600'],
+    spark: ['#ffff00', '#ffdd00', '#ffffff'],
+    debris: ['#c17a3f', '#8a4a20', '#5a2a10'],
+    explosion: ['#ff4400', '#ffaa00', '#ff6600', '#ffff00'],
+    bigExplosion: ['#ff4400', '#ffaa00', '#ff6600', '#ffff00', '#ffffff', '#888888']
+  }[type] || ['#fff'];
+
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = type === 'bigExplosion' ? 2 + Math.random() * 4 : 0.5 + Math.random() * 2.5;
+    const life = type === 'bigExplosion' ? 1.8 : 0.9;
+    let color = colorOverride && Math.random() < 0.5 ? colorOverride : palette[Math.floor(Math.random() * palette.length)];
+    G.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 0.5,
+      life, maxLife: life,
+      size: type === 'bigExplosion' ? 4 + Math.random() * 6 : 2 + Math.random() * 3,
+      color,
+      rotation: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.3
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (const p of G.particles) {
+    p.x += p.vx * 60 * dt;
+    p.y += p.vy * 60 * dt;
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+    p.vy += 0.08;
+    p.life -= dt;
+    p.rotation += p.spin;
+  }
+  G.particles = G.particles.filter(p => p.life > 0);
+}
+
+function drawParticles(ctx) {
+  for (const p of G.particles) {
+    const alpha = Math.min(1, p.life / p.maxLife * 2);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    const size = p.size * (0.4 + alpha * 0.6);
+    ctx.fillRect(-size/2, -size/2, size, size);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ===================================================
+// КАРТА
+// ===================================================
+function loadMap(index) {
+  G.currentMapIndex = index;
+  G.map = MAPS[index].map(row => row.slice());
+  G.mapHP = G.map.map(row => row.map(cell => cell === CELL_WALL ? WALL_HP_MAX : 0));
+
+  G.foliage = [];
+  for (let r = 0; r < MAP_SIZE; r++) {
+    for (let c = 0; c < MAP_SIZE; c++) {
+      const cell = G.map[r][c];
+      if (isFoliage(cell)) {
+        G.foliage.push({
+          r, c, type: cell,
+          phase: Math.random() * Math.PI * 2,
+          size: 0.85 + Math.random() * 0.3,
+          offsetX: (Math.random() - 0.5) * 8,
+          offsetY: (Math.random() - 0.5) * 8
+        });
+      }
+    }
+  }
+}
+
+function drawMap(ctx, time) {
+  for (let r = 0; r < MAP_SIZE; r++) {
+    for (let c = 0; c < MAP_SIZE; c++) {
+      const cell = G.map[r][c];
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+
+      if (cell === CELL_EMPTY || isFoliage(cell)) {
+        const grad = ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
+        if ((r + c) % 2 === 0) {
+          grad.addColorStop(0, '#1e2438');
+          grad.addColorStop(1, '#181d30');
+        } else {
+          grad.addColorStop(0, '#181d30');
+          grad.addColorStop(1, '#13182a');
+        }
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = 'rgba(79,195,247,0.06)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+      } else if (cell === CELL_WALL) {
+        drawWall(ctx, x, y, G.mapHP[r][c], false);
+      } else if (cell === CELL_STEEL) {
+        drawWall(ctx, x, y, 0, true);
+      }
+    }
+  }
+
+  for (const t of G.treads) {
+    ctx.globalAlpha = t.life * 0.4;
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(t.x - 2, t.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+
+  for (const f of G.foliage) {
+    drawFoliage(ctx, f, time);
+  }
+}
+
+function drawFoliage(ctx, f, time) {
+  const x = f.c * TILE_SIZE + TILE_SIZE / 2 + f.offsetX;
+  const y = f.r * TILE_SIZE + TILE_SIZE / 2 + f.offsetY;
+  const sway = Math.sin(time * 0.001 + f.phase) * 2;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (f.type === 3) {
+    const s = TILE_SIZE * 0.55 * f.size;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(2, s * 0.5, s * 0.7, s * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bushColors = ['#2d5a2d', '#3a7a3a', '#4a9a4a'];
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2 + sway * 0.05;
+      const dist = s * 0.35;
+      const bx = Math.cos(angle) * dist;
+      const by = Math.sin(angle) * dist * 0.6 - s * 0.15;
+      ctx.fillStyle = bushColors[i % 3];
+      ctx.beginPath();
+      ctx.arc(bx, by, s * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#5ab05a';
+    ctx.beginPath();
+    ctx.arc(0, -s * 0.2, s * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(150,255,150,0.4)';
+    ctx.beginPath();
+    ctx.arc(-s * 0.15, -s * 0.35, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (f.type === 4) {
+    const s = TILE_SIZE * 0.6 * f.size;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(3, s * 0.6, s * 0.5, s * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#4a2e1a';
+    ctx.fillRect(-3, 0, 6, s * 0.55);
+    ctx.fillStyle = '#6b4423';
+    ctx.fillRect(-2, 0, 3, s * 0.55);
+
+    ctx.fillStyle = '#1e4a1e';
+    ctx.beginPath();
+    ctx.arc(sway * 0.3, -s * 0.15, s * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2d6b2d';
+    ctx.beginPath();
+    ctx.arc(sway * 0.3, -s * 0.25, s * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3d8a3d';
+    ctx.beginPath();
+    ctx.arc(sway * 0.3 - s * 0.1, -s * 0.35, s * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(120,220,120,0.5)';
+    ctx.beginPath();
+    ctx.arc(sway * 0.3 - s * 0.15, -s * 0.45, s * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (f.type === 5) {
+    const s = TILE_SIZE * 0.5 * f.size;
+    ctx.strokeStyle = '#3d7a3d';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const offsetX = (i - 2) * 3;
+      const height = s * (0.5 + Math.random() * 0.3);
+      const swayX = sway * (0.5 + i * 0.15);
+      ctx.beginPath();
+      ctx.moveTo(offsetX, s * 0.3);
+      ctx.quadraticCurveTo(offsetX + swayX * 0.5, 0, offsetX + swayX, -height);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#6ab86a';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const offsetX = (i - 1) * 4;
+      const swayX = sway * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(offsetX, s * 0.2);
+      ctx.quadraticCurveTo(offsetX + swayX * 0.5, -s * 0.15, offsetX + swayX, -s * 0.5);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawWall(ctx, x, y, hp, isSteel) {
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(x + 4, y + 4, TILE_SIZE, TILE_SIZE);
+
+  if (isSteel) {
+    const grad = ctx.createLinearGradient(x, y, x + TILE_SIZE, y + TILE_SIZE);
+    grad.addColorStop(0, '#8a9aaa');
+    grad.addColorStop(0.3, '#6a7a8a');
+    grad.addColorStop(0.7, '#4a5a6a');
+    grad.addColorStop(1, '#2a3a4a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+
+    ctx.fillStyle = '#1a2a3a';
+    for (const [dx, dy] of [[8,8], [TILE_SIZE-11,8], [8,TILE_SIZE-11], [TILE_SIZE-11,TILE_SIZE-11]]) {
+      ctx.beginPath();
+      ctx.arc(x + dx, y + dy, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, 3);
+  } else {
+    const damage = 1 - (hp / WALL_HP_MAX);
+    const rr = Math.round(200 - damage * 100);
+    const gg = Math.round(130 - damage * 70);
+    const bb = Math.round(60 - damage * 40);
+
+    const grad = ctx.createLinearGradient(x, y, x, y + TILE_SIZE);
+    grad.addColorStop(0, `rgb(${rr},${gg},${bb})`);
+    grad.addColorStop(0.5, `rgb(${Math.max(rr-30,0)},${Math.max(gg-20,0)},${Math.max(bb-15,0)})`);
+    grad.addColorStop(1, `rgb(${Math.max(rr-70,0)},${Math.max(gg-50,0)},${Math.max(bb-30,0)})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1.8;
+
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x, y + i * TILE_SIZE / 4);
+      ctx.lineTo(x + TILE_SIZE, y + i * TILE_SIZE / 4);
+      ctx.stroke();
+    }
+
+    for (let row = 0; row < 4; row++) {
+      const offset = (row % 2) * TILE_SIZE / 4;
+      for (let col = 0; col <= 2; col++) {
+        const cx = x + offset + col * TILE_SIZE / 2;
+        if (cx > x + 1 && cx < x + TILE_SIZE - 1) {
+          ctx.beginPath();
+          ctx.moveTo(cx, y + row * TILE_SIZE / 4);
+          ctx.lineTo(cx, y + (row + 1) * TILE_SIZE / 4);
+          ctx.stroke();
+        }
+      }
+    }
+
+    if (damage > 0.25) {
+      ctx.strokeStyle = 'rgba(20,10,0,0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, y + 6);
+      ctx.lineTo(x + 14, y + 18);
+      ctx.lineTo(x + 10, y + 28);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, 2);
+  }
+
+  ctx.strokeStyle = isSteel ? 'rgba(20,30,40,0.9)' : 'rgba(60,30,10,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+}
+
+// ===================================================
+// СОЗДАНИЕ ТАНКОВ
+// ===================================================
+function createTanks() {
+  const p1Local = (G.mode === 'solo') || (G.mode === 'online' && G.myRole === 'p1');
+  const p2Local = (G.mode === 'solo') || (G.mode === 'online' && G.myRole === 'p2');
+
+  G.tanks = {
+    p1: new Tank('p1', TANK_START.p1.x, TANK_START.p1.y, TANK_START.p1.angle,
+      { main: '#4fc3f7', dark: '#0288d1', light: '#81d4fa' }, p1Local),
+    p2: new Tank('p2', TANK_START.p2.x, TANK_START.p2.y, TANK_START.p2.angle,
+      { main: '#ff6b6b', dark: '#cc0000', light: '#ff9999' }, p2Local)
+  };
+}
+
+// ===================================================
+// ИГРОВОЙ ЦИКЛ
+// ===================================================
+let engineWasPlaying = false;
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - G.lastTime) / 1000, 0.1);
+  G.lastTime = timestamp;
+
+  update(dt, timestamp);
+  render(timestamp);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function update(dt, timestamp) {
+  if (G.phase === 'playing') {
+    if (G.tanks.p1) G.tanks.p1.update(dt);
+    if (G.tanks.p2) G.tanks.p2.update(dt);
+
+    // Все обновляют пули (гость — без проверки попаданий в танки, только движение и отскоки)
+    updateBullets(dt);
+    updateParticles(dt);
+
+    for (const t of G.treads) t.life -= dt * 0.3;
+    G.treads = G.treads.filter(t => t.life > 0);
+
+    try {
+      for (const id of ['p1', 'p2']) {
+        const t = G.tanks[id];
+        if (!t || !t.alive || !t.isLocalInput) continue;
+        if (t.speedFactor > 0.4 && Math.random() < 0.5) {
+          G.treads.push({ x: t.x - Math.sin(t.angle) * 10, y: t.y + Math.cos(t.angle) * 10, life: 1 });
+          G.treads.push({ x: t.x + Math.sin(t.angle) * 10, y: t.y - Math.cos(t.angle) * 10, life: 1 });
+        }
+      }
+    } catch(e) {}
+
+    try {
+      if (Sound.enabled && Sound.ctx) {
+        const myTank = G.mode === 'solo' ? G.tanks.p1 : G.tanks[G.myRole];
+        const speed = myTank ? myTank.speedFactor : 0;
+        if (!engineWasPlaying) {
+          Sound.startEngine();
+          engineWasPlaying = true;
+        }
+        Sound.updateEngine(speed);
+      }
+    } catch(e) {}
+
+    // 🎯 Синхронизация: И хост, И гость отправляют состояние
+    if (G.mode === 'online' && G.connected) {
+      const now = performance.now();
+      if (now - G.lastSyncTime > 40) {
+        G.lastSyncTime = now;
+        sendState();
+      }
+    }
+  } else if (G.phase === 'roundWait') {
+    updateRoundTransition(dt);
+    updateParticles(dt);
+  } else {
+    updateParticles(dt);
+    for (const t of G.treads) t.life -= dt * 0.3;
+    G.treads = G.treads.filter(t => t.life > 0);
+
+    if (engineWasPlaying) {
+      Sound.stopEngine();
+      engineWasPlaying = false;
+    }
+  }
+}
+
+function render(timestamp) {
+  const ctx = G.ctx;
+  if (!ctx) return;
+
+  const bgGrad = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  bgGrad.addColorStop(0, '#0f1420');
+  bgGrad.addColorStop(1, '#0a0e18');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  if (G.map && G.map.length > 0) drawMap(ctx, timestamp);
+  if (G.tanks.p1) G.tanks.p1.draw(ctx);
+  if (G.tanks.p2) G.tanks.p2.draw(ctx);
+  drawBullets(ctx);
+  drawParticles(ctx);
+}
+
+// ===================================================
+// СЕТЬ
+// ===================================================
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function createRoom() {
+  G.roomCode = generateCode();
+  G.isHost = true;
+  G.mode = 'online';
+  G.myRole = 'p1';
+
+  document.body.classList.remove('online-p2');
+  document.body.classList.add('online-p1');
+
+  document.getElementById('roomCodeDisplay').textContent = G.roomCode;
+  const base = window.location.origin + window.location.pathname;
+  document.getElementById('linkInput').value = `${base}?room=${G.roomCode}`;
+
+  G.peer = new Peer('tanks-' + G.roomCode, { debug: 1, config: ICE_SERVERS });
+
+  G.peer.on('open', () => {
+    document.getElementById('waitingText').textContent = '⏳ Ожидание друга...';
+  });
+
+  G.peer.on('connection', (conn) => {
+    if (G.conn && G.conn.open) { conn.close(); return; }
+    G.conn = conn;
+    setupConnection();
+
+    G.conn.on('open', () => {
+      showNotification('🎉 Друг подключился!');
+      Sound.playClick();
+
+      setTimeout(() => {
+        Input.init();
+        // Хост генерирует первую карту и стартует
+        const mapIndex = Math.floor(Math.random() * MAPS.length);
+        document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+        document.getElementById('roundBanner').classList.remove('show');
+        G.score = { p1: 0, p2: 0 };
+        updateScoreDisplay();
+        beginRoundWithMap(mapIndex);
+        document.getElementById('name1').textContent = 'ВЫ';
+        document.getElementById('name2').textContent = 'ПРОТИВНИК';
+        // Отправляем гостю команду старта
+        sendMessage({ type: 'startRound', mapIndex: mapIndex, score: G.score });
+      }, 800);
+    });
+  });
+
+  G.peer.on('error', (err) => {
+    if (err.type === 'unavailable-id') createRoom();
+    else document.getElementById('waitingText').textContent = '❌ Ошибка: ' + err.type;
+  });
+}
+
+function joinGame() {
+  const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  const errEl = document.getElementById('joinError');
+  if (code.length !== 6) { errEl.textContent = '❌ Код из 6 символов'; return; }
+  errEl.textContent = '🔄 Подключение...';
+  G.mode = 'online';
+  G.isHost = false;
+  G.myRole = 'p2';
+
+  document.body.classList.remove('online-p1');
+  document.body.classList.add('online-p2');
+
+  G.peer = new Peer({ debug: 1, config: ICE_SERVERS });
+
+  let failed = false;
+  G.peer.on('open', () => {
+    G.conn = G.peer.connect('tanks-' + code, { reliable: true });
+    G.conn.on('open', () => {
+      failed = false;
+      setupConnection();
+      showNotification('✅ Подключено!');
+      Input.init();
+    });
+  });
+
+  G.peer.on('error', (err) => {
+    if (failed) return;
+    failed = true;
+    errEl.textContent = err.type === 'peer-unavailable' ? '❌ Комната не найдена' : '❌ Ошибка: ' + err.type;
+  });
+
+  setTimeout(() => {
+    if (!G.conn || !G.conn.open) {
+      if (!failed && errEl.textContent === '🔄 Подключение...') {
+        errEl.textContent = '❌ Превышено время ожидания';
+      }
+    }
+  }, 20000);
+}
+
+function setupConnection() {
+  G.connected = true;
+  G.conn.on('data', handleNetMessage);
+  G.conn.on('close', () => {
+    G.connected = false;
+    showNotification('⚠️ Соперник отключился');
+    G.phase = 'paused';
+  });
+  G.conn.on('error', (err) => console.error('Conn:', err));
+}
+
+function sendMessage(msg) {
+  if (G.conn && G.conn.open) {
+    try { G.conn.send(msg); } catch(e) {}
+  }
+}
+
+function sendState() {
+  if (!G.tanks[G.myRole]) return;
+  const t = G.tanks[G.myRole];
+  sendMessage({
+    type: 'state',
+    role: G.myRole,
+    x: t.x, y: t.y,
+    angle: t.angle, turretAngle: t.turretAngle,
+    trackOffset: t.trackOffset,
+    alive: t.alive,
+    recoil: t.recoil
+  });
+}
+
+function handleNetMessage(msg) {
+  switch (msg.type) {
+    case 'state': {
+      // 🎯 И хост, и гость принимают состояния друг друга
+      const opp = msg.role === 'p1' ? 'p2' : 'p1';
+      const o = G.tanks[opp];
+      if (o) {
+        o.x += (msg.x - o.x) * 0.5;
+        o.y += (msg.y - o.y) * 0.5;
+        o.angle = msg.angle;
+        o.turretAngle = msg.turretAngle;
+        o.trackOffset = msg.trackOffset;
+        o.alive = msg.alive;
+        o.recoil = msg.recoil || 0;
+      }
+      break;
+    }
+
+    // 🎯 Гость просит хоста создать снаряд (гость стреляет)
+    case 'shootRequest': {
+      if (!G.isHost) break;
+      // Хост создаёт снаряд от имени гостя
+      createBullet(msg.x, msg.y, msg.angle, msg.shooter);
+      // Хост оповещает гостя, что снаряд создан (для визуала у гостя)
+      sendMessage({ type: 'spawnBullet', x: msg.x, y: msg.y, angle: msg.angle, owner: msg.shooter });
+      break;
+    }
+
+    // 🎯 Хост создал снаряд (свой или по просьбе гостя) — гость отображает
+    case 'spawnBullet': {
+      if (G.isHost) break;
+      // Проверяем, чтобы не дублировать
+      const exists = G.bullets.some(b =>
+        Math.abs(b.x - msg.x) < 2 && Math.abs(b.y - msg.y) < 2
+      );
+      if (!exists) {
+        createBullet(msg.x, msg.y, msg.angle, msg.owner);
+      }
+      break;
+    }
+
+    case 'wall': {
+      G.map[msg.row][msg.col] = CELL_EMPTY;
+      G.mapHP[msg.row][msg.col] = 0;
+      spawnParticles(msg.col * TILE_SIZE + TILE_SIZE/2, msg.row * TILE_SIZE + TILE_SIZE/2, 'explosion');
+      Sound.playExplosion();
+      break;
+    }
+    case 'wallHp': {
+      G.mapHP[msg.row][msg.col] = msg.hp;
+      break;
+    }
+
+    // 🎯 Хост сообщает гостю о смерти танка
+    case 'tankDied': {
+      if (G.isHost) break;
+      const tank = G.tanks[msg.tankId];
+      if (tank) {
+        tank.alive = false;
+        spawnParticles(tank.x, tank.y, 'bigExplosion');
+        Sound.playExplosion();
+        vibrate([80, 30, 80]);
+      }
+      // Синхронизируем счёт от хоста
+      G.score = msg.score;
+      updateScoreDisplay();
+      break;
+    }
+
+    // 🎯 Хост сообщает гостю о переходе раунда (показ баннера)
+    case 'roundTransition': {
+      if (G.isHost) break;
+      G.score = msg.score;
+      updateScoreDisplay();
+      startRoundTransition(msg.winnerId);
+      break;
+    }
+
+    // 🎯 Хост сообщает гостю о конце игры
+    case 'gameOver': {
+      if (G.isHost) break;
+      endGame(msg.winner);
+      break;
+    }
+
+    // 🎯 Гость просит хоста перезапустить игру
+    case 'restartRequest': {
+      if (!G.isHost) break;
+      if (G.phase !== 'gameover') break;
+      G.score = { p1: 0, p2: 0 };
+      updateScoreDisplay();
+      const mapIndex = Math.floor(Math.random() * MAPS.length);
+      beginRoundWithMap(mapIndex);
+      sendMessage({ type: 'startRound', mapIndex: mapIndex, score: G.score });
+      break;
+    }
+
+    // 🎯 Хост запускает новый раунд у гостя
+    case 'startRound': {
+      document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+      document.getElementById('roundBanner').classList.remove('show');
+      G.score = msg.score || { p1: 0, p2: 0 };
+      updateScoreDisplay();
+      document.getElementById('name1').textContent = 'ПРОТИВНИК';
+      document.getElementById('name2').textContent = 'ВЫ';
+      beginRoundWithMap(msg.mapIndex);
+      break;
+    }
+
+    case 'restart': {
+      G.score = { p1: 0, p2: 0 };
+      updateScoreDisplay();
+      break;
+    }
+  }
+}
+
+// ===================================================
+// UI
+// ===================================================
+function showCreateScreen() {
+  Sound.playClick();
+  document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+  document.getElementById('createScreen').classList.remove('hidden');
+  createRoom();
+}
+
+function showJoinScreen() {
+  Sound.playClick();
+  document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+  document.getElementById('joinScreen').classList.remove('hidden');
+  const url = new URLSearchParams(window.location.search);
+  const room = url.get('room');
+  if (room) {
+    document.getElementById('joinCodeInput').value = room.toUpperCase();
+    setTimeout(joinGame, 400);
+  }
+}
+
+function backToMenu() {
+  Sound.stopEngine();
+  engineWasPlaying = false;
+  if (G.peer) { try { G.peer.destroy(); } catch(e){} }
+  if (G.conn) { try { G.conn.close(); } catch(e){} }
+  G.peer = null; G.conn = null; G.connected = false;
+  G.mode = 'solo';
+  G.myRole = null;
+  G.currentMapIndex = -1;
+  document.body.classList.remove('online-p1');
+  document.body.classList.remove('online-p2');
+  document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+  document.getElementById('roundBanner').classList.remove('show');
+  document.getElementById('menuScreen').classList.remove('hidden');
+  G.phase = 'menu';
+}
+
+function copyLink() {
+  const el = document.getElementById('linkInput');
+  el.select();
+  el.setSelectionRange(0, 99999);
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(el.value).then(() => showNotification('✅ Скопировано!'));
+  } else {
+    document.execCommand('copy');
+    showNotification('✅ Скопировано!');
+  }
+  Sound.playClick();
+}
+
+function startSoloMode() {
+  Sound.playClick();
+  G.mode = 'solo';
+  G.myRole = null;
+  document.body.classList.remove('online-p1');
+  document.body.classList.remove('online-p2');
+  document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+  document.getElementById('roundBanner').classList.remove('show');
+  G.score = { p1: 0, p2: 0 };
+  updateScoreDisplay();
+  document.getElementById('name1').textContent = 'P1';
+  document.getElementById('name2').textContent = 'P2';
+
+  const mapIndex = Math.floor(Math.random() * MAPS.length);
+  beginRoundWithMap(mapIndex);
+
+  Input.init();
+}
+
+function restartMatch() {
+  Sound.playClick();
+  document.getElementById('gameoverScreen').classList.add('hidden');
+
+  if (G.mode === 'online') {
+    if (G.isHost) {
+      G.score = { p1: 0, p2: 0 };
+      updateScoreDisplay();
+      const mapIndex = Math.floor(Math.random() * MAPS.length);
+      beginRoundWithMap(mapIndex);
+      sendMessage({ type: 'startRound', mapIndex: mapIndex, score: G.score });
+    } else {
+      // Гость просит хоста перезапустить
+      sendMessage({ type: 'restartRequest' });
+    }
+  } else {
+    G.score = { p1: 0, p2: 0 };
+    updateScoreDisplay();
+    const mapIndex = Math.floor(Math.random() * MAPS.length);
+    beginRoundWithMap(mapIndex);
+  }
+}
+
+function endGame(winnerId) {
+  G.phase = 'gameover';
+  Sound.stopEngine();
+  engineWasPlaying = false;
+
+  let title = '🏆 КОНЕЦ';
+  let text = '';
+
+  if (G.mode === 'solo') {
+    title = winnerId === 'p1' ? '🔵 P1 ПОБЕДИЛ!' : '🔴 P2 ПОБЕДИЛ!';
+    text = `Финальный счёт: ${G.score.p1} : ${G.score.p2}`;
+  } else {
+    const iWon = winnerId === G.myRole;
+    const myScore = G.score[G.myRole];
+    const oppScore = G.score[G.myRole === 'p1' ? 'p2' : 'p1'];
+    if (iWon) {
+      title = '🏆 ВЫ ПОБЕДИЛИ!';
+      text = `Финальный счёт: ${myScore} : ${oppScore}`;
+      Sound.playVictory();
+    } else {
+      title = '💀 ВЫ ПРОИГРАЛИ';
+      text = `Финальный счёт: ${myScore} : ${oppScore}`;
+      Sound.playRoundLose();
+    }
+  }
+
+  document.getElementById('gameoverTitle').textContent = title;
+  document.getElementById('gameoverText').textContent = text;
+  document.getElementById('gameoverScreen').classList.remove('hidden');
+}
+
+function updateScoreDisplay() {
+  document.getElementById('score1').textContent = G.score.p1;
+  document.getElementById('score2').textContent = G.score.p2;
+  document.getElementById('roundNum').textContent = `${G.score.p1} : ${G.score.p2}`;
+}
+
+let notifTimer = null;
+function showNotification(text) {
+  const n = document.getElementById('notification');
+  n.textContent = text;
+  n.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => n.classList.remove('show'), 1500);
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('canvasWrap');
+  const wrapRect = wrap.getBoundingClientRect();
+  const size = Math.min(wrapRect.width, wrapRect.height) - 20;
+  G.canvas.width = CANVAS_SIZE;
+  G.canvas.height = CANVAS_SIZE;
+  G.canvas.style.width = size + 'px';
+  G.canvas.style.height = size + 'px';
+}
+
+// ===================================================
+// СТАРТ
+// ===================================================
+window.addEventListener('load', () => {
+  G.canvas = document.getElementById('gameCanvas');
+  G.ctx = G.canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+
+  Input.init();
+
+  loadMap(0);
+  createTanks();
+
+  G.lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+});
+</script>
+
+</body>
+</html>
